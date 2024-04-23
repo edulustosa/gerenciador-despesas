@@ -153,22 +153,14 @@ export async function transactionsRoutes(app: FastifyInstance) {
         })
       }
 
+      const amount = parsedUpdatedTransaction.amount || transaction.amount
+      const transactionType = parsedUpdatedTransaction.type || transaction.type
+
       if (
-        parsedUpdatedTransaction.type &&
-        parsedUpdatedTransaction.type !== transaction.type
+        (transactionType === 'credit' && amount < 0) ||
+        (transactionType === 'debit' && amount > 0)
       ) {
-        parsedUpdatedTransaction.amount = parsedUpdatedTransaction.amount
-          ? parsedUpdatedTransaction.amount * -1
-          : transaction.amount * -1
-      } else if (
-        parsedUpdatedTransaction.amount &&
-        ((transaction.type === 'credit' &&
-          parsedUpdatedTransaction.amount < 0) ||
-          (transaction.type === 'debit' && parsedUpdatedTransaction.amount > 0))
-      ) {
-        parsedUpdatedTransaction.amount = parsedUpdatedTransaction.amount
-          ? parsedUpdatedTransaction.amount * -1
-          : transaction.amount * -1
+        parsedUpdatedTransaction.amount = amount * -1
       }
 
       const updatedTransaction = await knex('transactions')
