@@ -70,8 +70,6 @@ describe('Transactions routes', () => {
 
     const transactionId = listTransactionsResponse.body.transactions[0].id
 
-    console.log(transactionId)
-
     const getTransactionResponse = await request(app.server)
       .get(`/transactions/${transactionId}`)
       .set('Cookie', cookies)
@@ -115,5 +113,69 @@ describe('Transactions routes', () => {
     expect(summaryResponse.body.summary).toEqual({
       amount: 500,
     })
+  })
+
+  it('should be able to delete a transaction', async () => {
+    const createTransactionResponse = await request(app.server)
+      .post('/transactions')
+      .send({
+        title: 'Test transaction',
+        amount: 5000,
+        type: 'credit',
+      })
+
+    const cookies = createTransactionResponse.get('Set-Cookie')
+
+    if (!cookies) throw new Error("cookies don't exist")
+
+    const listTransactionsResponse = await request(app.server)
+      .get('/transactions')
+      .set('Cookie', cookies)
+      .expect(200)
+
+    const transactionId = listTransactionsResponse.body.transactions[0].id
+
+    await request(app.server)
+      .delete(`/transactions/${transactionId}`)
+      .set('Cookie', cookies)
+      .expect(200)
+  })
+
+  it('should be able to update a transaction', async () => {
+    const createTransactionResponse = await request(app.server)
+      .post('/transactions')
+      .send({
+        title: 'Test transaction',
+        amount: 5000,
+        type: 'credit',
+      })
+
+    const cookies = createTransactionResponse.get('Set-Cookie')
+
+    if (!cookies) throw new Error("cookies don't exist")
+
+    const listTransactionsResponse = await request(app.server)
+      .get('/transactions')
+      .set('Cookie', cookies)
+      .expect(200)
+
+    const transactionId = listTransactionsResponse.body.transactions[0].id
+
+    const getUpdatedTransactionResponse = await request(app.server)
+      .put(`/transactions/${transactionId}`)
+      .set('Cookie', cookies)
+      .send({
+        title: 'Updated transaction',
+        amount: 2500,
+        type: 'debit',
+      })
+
+    expect(getUpdatedTransactionResponse.body.transaction).toEqual(
+      expect.objectContaining({
+        title: 'Updated transaction',
+        amount: -2500,
+        type: 'debit',
+      }),
+    )
   })
 })

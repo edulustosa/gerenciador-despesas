@@ -6,6 +6,12 @@ import { checkSessionIdExists } from '../middlewares/check-session-id-exists'
 
 // Cookies <-> Formas de manter contexto entre requisições
 
+interface Transaction {
+  title?: string | undefined
+  amount?: number | undefined
+  type?: 'credit' | 'debit' | undefined
+}
+
 export async function transactionsRoutes(app: FastifyInstance) {
   /*
     * Hook que é adicionado a todas as rotas dessa função
@@ -99,9 +105,106 @@ export async function transactionsRoutes(app: FastifyInstance) {
       id: randomUUID(),
       title,
       amount: type === 'credit' ? amount : amount * -1,
+      type,
       session_id: sessionId,
     })
 
     return reply.status(201).send()
   })
+
+  app.put(
+    '/:id',
+    {
+      preHandler: [checkSessionIdExists],
+    },
+    async (request, reply) => {
+      const createTransactionBodySchema = z.object({
+        title: z.string().optional(),
+        amount: z.number().optional(),
+        type: z.enum(['credit', 'debit']).optional(),
+      })
+
+      const getTransactionParamSchema = z.object({
+        id: z.string().uuid(),
+      })
+
+      const parsedUpdatedTransaction: Transaction =
+        createTransactionBodySchema.parse(request.body)
+
+      const { id } = getTransactionParamSchema.parse(request.params)
+      const { sessionId } = request.cookies
+
+      for (const key in parsedUpdatedTransaction) {
+        if (!parsedUpdatedTransaction[key as keyof Transaction]) {
+          delete parsedUpdatedTransaction[key as keyof Transaction]
+        }
+      }
+
+      const transaction = await knex('transactions')
+        .where({
+          id,
+          session_id: sessionId,
+        })
+        .first()
+
+      if (!transaction) {
+        return reply.code(400).send({
+          error: "Transaction don't exist",
+        })
+      }
+
+      if (
+        parsedUpdatedTransaction.type &&
+        parsedUpdatedTransaction.type !== transaction.type
+      ) {
+        parsedUpdatedTransaction.amount = parsedUpdatedTransaction.amount
+          ? parsedUpdatedTransaction.amount * -1
+          : transaction.amount * -1
+      } else if (
+        parsedUpdatedTransaction.amount &&
+        ((transaction.type === 'credit' &&
+          parsedUpdatedTransaction.amount < 0) ||
+          (transaction.type === 'debit' && parsedUpdatedTransaction.amount > 0))
+      ) {
+        parsedUpdatedTransaction.amount = parsedUpdatedTransaction.amount
+          ? parsedUpdatedTransaction.amount * -1
+          : transaction.amount * -1
+      }
+
+      const updatedTransaction = await knex('transactions')
+        .where({
+          id,
+          session_id: sessionId,
+        })
+        .update(parsedUpdatedTransaction)
+        .returning('*')
+
+      return { transaction: updatedTransaction[0] }
+    },
+  )
+
+  app.delete(
+    '/:id',
+    {
+      preHandler: [checkSessionIdExists],
+    },
+    async (request, reply) => {
+      const getTransactionParamSchema = z.object({
+        id: z.string().uuid(),
+      })
+
+      const { id } = getTransactionParamSchema.parse(request.params)
+
+      const { sessionId } = request.cookies
+
+      await knex('transactions')
+        .where({
+          id,
+          session_id: sessionId,
+        })
+        .del()
+
+      return reply.status(200).send()
+    },
+  )
 }
