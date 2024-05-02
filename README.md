@@ -7,7 +7,7 @@ Esse Gerenciador de Despesas é uma aplicação RESTful desenvolvida para gerenc
 1. Clone o repositório:
 
 ``` bash
-git clone https://github.com/seu-usuario/gerenciador-despesas.git
+git clone https://github.com/edulustosa/gerenciador-despesas.git
 ```
 
 2. Instale as dependências:
